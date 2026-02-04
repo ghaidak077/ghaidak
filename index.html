@@ -14,12 +14,12 @@
 
     <link rel="icon" type="image/svg+xml" href="tab_logo.svg">
     
-    <link rel="preconnect" href="https://grainy-gradients.vercel.app">
     <link rel="preload" href="./fonts/Syne-ExtraBold.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="./fonts/SpaceMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" as="image" href="4.webp">
+    <link rel="preload" as="image" href="4.webp" fetchpriority="high">
 
     <style>
+        /* FONTS */
         @font-face { font-family: 'Syne'; src: url('./fonts/Syne-Regular.woff2') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
         @font-face { font-family: 'Syne'; src: url('./fonts/Syne-Bold.woff2') format('woff2'); font-weight: 700; font-style: normal; font-display: swap; }
         @font-face { font-family: 'Syne'; src: url('./fonts/Syne-ExtraBold.woff2') format('woff2'); font-weight: 800; font-style: normal; font-display: swap; }
@@ -43,40 +43,43 @@
             --nav-h: 72px;
             --nav-offset: 1.25rem;
             --nav-gap: clamp(1.25rem, 3vw, 2.25rem);
-            --radius-sharp: 2px; /* The Precision Rule */
+            --radius-sharp: 2px;
         }
 
         *{margin:0;padding:0;box-sizing:border-box;-webkit-font-smoothing:antialiased}
         html{height:100%}
         body{background:var(--bg);color:var(--ink);font-family:var(--font-data);overflow-x:hidden;width:100%;position:relative;cursor:auto}
 
-        /* Accessibility */
+        /* UTILS */
         .skip-link{position:absolute;left:-999px;top:0;background:#000;color:#fff;padding:.75rem 1rem;z-index:10001;border:1px solid rgba(255,255,255,.2)}
         .skip-link:focus{left:1rem;top:1rem}
 
-        /* Cursor */
-        .cursor-dot{width:6px;height:6px;background-color:var(--accent);position:fixed;top:0;left:0;transform:translate(-50%,-50%);border-radius:50%;z-index:9999;pointer-events:none}
-        .cursor-outline{width:30px;height:30px;border:1px solid var(--accent);position:fixed;top:0;left:0;transform:translate(-50%,-50%);border-radius:50%;z-index:9998;pointer-events:none;transition:width .2s,height .2s,background-color .2s}
+        /* CURSOR (Optimized for GPU) */
+        .cursor-dot{width:6px;height:6px;background-color:var(--accent);position:fixed;top:0;left:0;border-radius:50%;z-index:9999;pointer-events:none;will-change:transform}
+        .cursor-outline{width:30px;height:30px;border:1px solid var(--accent);position:fixed;top:0;left:0;border-radius:50%;z-index:9998;pointer-events:none;transition:width .2s,height .2s,background-color .2s;will-change:transform}
         body.hovering .cursor-outline{width:50px;height:50px;background-color:rgba(255,198,62,.1);mix-blend-mode:difference}
 
         @media (any-hover:hover) and (pointer:fine){body{cursor:none}}
         @media (prefers-reduced-motion:reduce){.cursor-dot,.cursor-outline{display:none!important}body{cursor:auto}}
 
-        /* Loader */
+        /* LOADER */
         .loader-screen{position:fixed;inset:0;background:#000;z-index:10000;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#fff;height:100dvh;width:100vw}
         .loader-content{text-align:center}
         .loader-title{font-family:var(--font-display);font-size:clamp(2rem,8vw,4rem);font-weight:800;line-height:1;margin-bottom:1rem}
         .loader-meta{font-size:.8rem;color:var(--accent);letter-spacing:.1em;display:flex;gap:1rem;justify-content:center}
 
-        /* Backgrounds */
-        .noise-overlay{position:fixed;inset:0;pointer-events:none;z-index:50;opacity:.05;background-image:url("https://grainy-gradients.vercel.app/noise.svg");mix-blend-mode:overlay}
+        /* BACKGROUNDS */
+        /* FIXED: Replaced broken external SVG with base64 data URI to fix 402 Error and Latency */
+        .noise-overlay{position:fixed;inset:0;pointer-events:none;z-index:50;opacity:.05;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");mix-blend-mode:overlay}
+        
         .curtain-layer{position:fixed;inset:0;z-index:0;pointer-events:none;background:#000}
         .curtain-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.1);filter:blur(20px) grayscale(100%);transition:opacity .6s ease,transform .6s ease,filter .6s ease;will-change:opacity,transform}
+        
         .curtain-img.active-project{opacity:.3;transform:scale(1);filter:blur(0px) grayscale(0%)}
         .curtain-img.default-visible{opacity:.3;transform:scale(1);filter:blur(20px) grayscale(100%)}
         .vignette{position:absolute;inset:0;z-index:1;background:radial-gradient(circle at center,transparent 10%,#050505 120%)}
 
-        /* Glass Cards - Unified Sharpness */
+        /* GLASS PANELS */
         .glass-panel{
             background:var(--glass-bg);
             backdrop-filter:blur(var(--glass-blur));
@@ -86,12 +89,12 @@
             border-radius: var(--radius-sharp);
         }
 
-        /* Scroll top */
+        /* SCROLL BTN */
         .scroll-top-btn{position:fixed;bottom:2rem;right:2rem;width:44px;height:44px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);color:var(--accent);display:flex;align-items:center;justify-content:center;cursor:none;z-index:90;opacity:0;transform:translateY(20px);transition:all .3s;pointer-events:none; border-radius: var(--radius-sharp);}
         .scroll-top-btn.visible{opacity:1;transform:translateY(0);pointer-events:auto}
         .scroll-top-btn:hover{background:var(--accent);color:#000}
 
-        /* NAV: Blade Look */
+        /* NAVIGATION */
         .hud-nav{
             position:fixed;
             top:var(--nav-offset);
@@ -109,7 +112,8 @@
             background:rgba(10,10,10,.6);
             border:1px solid rgba(255,255,255,.08);
             border-radius: var(--radius-sharp);
-            transition:all .4s cubic-bezier(.16,1,.3,1);
+            /* PERFORMANCE: Use standard transition, JS handles the class switch */
+            transition:all .4s cubic-bezier(.16,1,.3,1); 
         }
         .hud-nav.scrolled{
             top:0;
@@ -127,7 +131,7 @@
         .nav-cta{flex:0 0 auto}
         .btn-short{display:none}
 
-        /* Buttons: Unified Sharpness */
+        /* BUTTONS */
         .btn-gold{
             color:var(--accent);
             text-decoration:none;
@@ -164,7 +168,7 @@
         .btn-terminal:hover{border-color:var(--accent);color:var(--accent);background:rgba(255,198,62,.05)}
         .btn-wide{width:100%;text-align:center}
 
-        /* Main */
+        /* LAYOUT */
         main{position:relative;z-index:10;width:100%;overflow:hidden}
         section[id]{scroll-margin-top:calc(var(--nav-h) + var(--nav-offset) + 1rem)}
 
@@ -177,7 +181,7 @@
         .hero-cta-group{display:flex;flex-direction:column;align-items:flex-end;gap:.5rem}
         .cta-note{font-size:.75rem;color:#666;font-family:var(--font-data);letter-spacing:.05em;font-style:italic}
 
-        /* Sections */
+        /* SECTIONS */
         .marquee-section{width:100%;border-top:1px solid var(--glass-border);border-bottom:1px solid var(--glass-border);padding:2rem 0;overflow:hidden;background:rgba(0,0,0,.5);margin-bottom:var(--space-xl)}
         .marquee-track{width:100%;display:flex;overflow:hidden}
         .marquee-content{display:flex;animation:marquee 30s linear infinite;flex-shrink:0;min-width:100%}
@@ -195,7 +199,7 @@
         .service-item ul{list-style:none}
         .service-item li{font-size:.9rem;color:var(--subtle-ink);margin-bottom:.8rem;padding-left:1rem;border-left:1px solid #333}
 
-        /* Projects */
+        /* PROJECTS */
         .list-section{padding:0 0 var(--space-xl);max-width:1400px;margin:0 auto}
         .project-item{display:block;position:relative;padding:var(--space-lg) var(--space-md);border-bottom:1px solid rgba(255,255,255,.1);text-decoration:none;color:#fff;transition:all .4s}
         .p-title{font-family:var(--font-display);font-size:clamp(2.4rem,6vw,5rem);font-weight:700;line-height:1;margin:.8rem 0;text-transform:uppercase}
@@ -207,7 +211,7 @@
             .project-item:hover .arrow{transform:translateX(20px) rotate(-45deg);opacity:1}
         }
 
-        /* Testimonials */
+        /* REVIEWS */
         .testimonials-section{padding:0 0 var(--space-xl);max-width:1400px;margin:0 auto}
         .reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;padding:0 var(--space-md)}
         .review-card{padding:2.5rem;display:flex;flex-direction:column;justify-content:space-between;min-height:300px}
@@ -215,7 +219,7 @@
         .review-text{font-size:.95rem;line-height:1.6;color:#ccc;margin-bottom:2rem}
         .review-author strong{display:block;color:#fff;font-family:var(--font-display)}
 
-        /* Profile */
+        /* PROFILE */
         .profile-section{padding:var(--space-lg) var(--space-md) var(--space-xl);background:#050505;position:relative;z-index:2;border-top:1px solid #111}
         .profile-content{max-width:1400px;margin:0 auto}
         .profile-header h2{font-family:var(--font-display);font-size:clamp(3.5rem,11vw,10rem);line-height:.8;color:#fff;margin-bottom:4rem;letter-spacing:-.04em}
@@ -227,7 +231,6 @@
         .bio-title{font-family:var(--font-display);font-size:1.35rem;margin-bottom:1rem;color:#fff;letter-spacing:-.01em}
         .bio-text{font-size:1.15rem;line-height:1.65;color:#bbb;margin-bottom:2.25rem;max-width:58ch}
         
-        /* Stats */
         .stats-row{display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:1rem;margin-bottom:1.5rem;padding-top:1.25rem;border-top:1px solid #222}
         .stat{padding:1.1rem 1.2rem;border:1px solid rgba(255,255,255,.10);background:rgba(255,255,255,.02);border-radius:14px;display:flex;flex-direction:column;gap:.35rem}
         .stat .val{font-family:var(--font-display);font-size:2.2rem;line-height:1;color:var(--accent);font-variant-numeric: tabular-nums;letter-spacing:-.02em}
@@ -238,10 +241,10 @@
         .social-link{color:var(--subtle-ink);text-decoration:none;font-size:.9rem;transition:.3s;border-bottom:1px solid transparent}
         .social-link:hover{color:var(--accent);border-bottom:1px solid var(--accent)}
 
-        /* Footer */
+        /* FOOTER */
         .site-footer{border-top:1px solid #222;padding:2rem var(--space-md);background:#000;display:flex;justify-content:space-between;font-size:.7rem;color:#999;letter-spacing:.05em;z-index:20;position:relative}
 
-        /* Responsive */
+        /* RESPONSIVE */
         @media(max-width:900px){
             .profile-grid-new{grid-template-columns:1fr;gap:3rem}
             .img-container{max-width:100%}
@@ -253,11 +256,8 @@
             :root{--nav-offset:0rem;--nav-h:56px;--nav-gap:1.25rem}
             .hud-nav{top:0;left:0;transform:none;width:100%;max-width:none;border-radius:0;min-height:var(--nav-h);padding:0 .85rem;background:rgba(5,5,5,.96);border:none;border-bottom:1px solid rgba(255,255,255,.12)}
             .nav-logo{height:24px;max-width:120px}
-            
-            /* Sharp edges on mobile */
             .hud-nav .btn-gold {border-radius: 2px;} 
             .btn-gold{font-size:.72rem;padding:.55rem .85rem;letter-spacing:.08em}
-
             .btn-full{display:none}
             .btn-short{display:inline}
             .hero-section{padding:calc(var(--nav-h) + var(--nav-gap)) 1.15rem 4rem;min-height:auto;height:auto}
@@ -274,7 +274,7 @@
             .glass-panel{backdrop-filter:none!important;background:rgba(20,20,20,.95)}
             .scroll-top-btn{bottom:1rem;right:1rem;width:40px;height:40px}
 
-            /* PERFORMANCE OVERRIDE: Kill the blur on mobile (LCP FIX) */
+            /* PERFORMANCE OVERRIDE: Eliminate blur on mobile to fix LCP delay */
             .curtain-img.default-visible {
                 filter: brightness(0.4) !important;
                 opacity: 1 !important;
@@ -316,13 +316,17 @@
 
     <div class="noise-overlay" aria-hidden="true"></div>
     <div class="curtain-layer" aria-hidden="true">
-        <img src="4.webp" id="bg-default" class="curtain-img default-visible" alt="" width="800" height="1000" fetchpriority="high" decoding="sync" style="will-change: transform, opacity; content-visibility: auto;">
+        <img src="4.webp" id="bg-default" class="curtain-img default-visible" alt="" 
+             width="800" height="1000" 
+             fetchpriority="high" decoding="sync" 
+             sizes="(max-width: 768px) 100vw, 100vw"
+             style="will-change: transform, opacity; content-visibility: auto;">
 
-        <img src="4.webp" id="bg-1" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async">
-        <img src="1.webp" id="bg-2" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async">
-        <img src="3.webp" id="bg-3" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async">
-        <img src="2.webp" id="bg-4" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async">
-        <img src="5.webp" id="bg-5" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async">
+        <img src="4.webp" id="bg-1" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async" sizes="(max-width: 768px) 100vw, 100vw">
+        <img src="1.webp" id="bg-2" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async" sizes="(max-width: 768px) 100vw, 100vw">
+        <img src="3.webp" id="bg-3" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async" sizes="(max-width: 768px) 100vw, 100vw">
+        <img src="2.webp" id="bg-4" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async" sizes="(max-width: 768px) 100vw, 100vw">
+        <img src="5.webp" id="bg-5" class="curtain-img" alt="" width="800" height="1000" loading="lazy" decoding="async" sizes="(max-width: 768px) 100vw, 100vw">
         <div class="vignette"></div>
     </div>
 
