@@ -1,24 +1,44 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const isMobile = window.matchMedia("(max-width: 768px)").matches;
-
+    // 1. Cache static queries and elements
     const root = document.documentElement;
     const navEl = document.querySelector('.hud-nav');
+    const loader = document.getElementById('loader');
+    const scrollTopBtn = document.getElementById('scrollTop');
+    const isMobileQuery = window.matchMedia("(max-width: 768px)");
+    let isMobile = isMobileQuery.matches;
 
+    // Update isMobile state on change without page reload
+    isMobileQuery.addEventListener('change', (e) => { isMobile = e.matches; });
+
+    // 2. Optimized Nav Variables (Fixes Forced Reflow)
     const setNavVars = () => {
         if (!navEl) return;
+        
+        // READ PHASE: Get dimensions
         const rect = navEl.getBoundingClientRect();
-        // Only update these on initial load/resize to avoid layout trashing
-        root.style.setProperty('--nav-h', `${Math.round(rect.height)}px`);
-        if(!navEl.classList.contains('scrolled')) {
-             root.style.setProperty('--nav-offset', `${Math.max(0, Math.round(rect.top))}px`);
-        }
+        const height = Math.round(rect.height);
+        const top = Math.max(0, Math.round(rect.top));
+
+        // WRITE PHASE: Batch DOM updates in the next frame
+        requestAnimationFrame(() => {
+            root.style.setProperty('--nav-h', `${height}px`);
+            if(!navEl.classList.contains('scrolled')) {
+                root.style.setProperty('--nav-offset', `${top}px`);
+            }
+        });
     };
 
+    // Initial calcs
     setNavVars();
-    window.addEventListener('resize', setNavVars, { passive: true });
-    window.addEventListener('load', setNavVars);
+    // Debounced resize listener
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(setNavVars, 100);
+    }, { passive: true });
 
-    const loader = document.getElementById('loader');
+
+    // 3. Loader Logic
     if (loader) {
         const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -27,21 +47,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 loader.style.display = 'none';
                 return;
             }
-            gsap.to(loader, { y: "-100%", duration: 0.7, ease: "power4.inOut" });
-            gsap.from(".reveal-text", { y: 60, opacity: 0, duration: 1.0, stagger: 0.08, ease: "power3.out", delay: 0.1 });
+            const tl = gsap.timeline({
+                onComplete: () => { loader.style.display = 'none'; }
+            });
+            
+            tl.to(loader, { yPercent: -100, duration: 0.7, ease: "power4.inOut" })
+              .from(".reveal-text", { 
+                  y: 60, 
+                  opacity: 0, 
+                  duration: 1.0, 
+                  stagger: 0.08, 
+                  ease: "power3.out" 
+              }, "-=0.2");
         };
 
-        // PERFORMANCE FIX: Instant load for mobile (LCP < 2.5s), smooth for desktop
+        // LCP Optimization: Immediate hide on mobile
         if (isMobile) {
-            hideLoader();
+            requestAnimationFrame(hideLoader);
         } else {
             setTimeout(hideLoader, 300);
         }
         
-        // Failsafe cleanup
-        setTimeout(() => { loader.style.display = 'none'; }, 2500);
+        // Safety timeout
+        setTimeout(() => { if(loader.style.display !== 'none') loader.style.display = 'none'; }, 2500);
     }
 
+    // 4. Scroll Logic (State Caching to reduce DOM hits)
+    let hasScrolledClass = false;
+    let isScrollBtnVisible = false;
+
+    const onScroll = () => {
+        const scrolled = window.scrollY;
+
+        // Nav Logic
+        if (!isMobile && navEl) {
+            const shouldBeScrolled = scrolled > 50;
+            if (shouldBeScrolled !== hasScrolledClass) {
+                if (shouldBeScrolled) {
+                    navEl.classList.add('scrolled');
+                } else {
+                    navEl.classList.remove('scrolled');
+                }
+                hasScrolledClass = shouldBeScrolled;
+            }
+        }
+
+        // Scroll Top Button Logic
+        if (scrollTopBtn) {
+            const shouldBtnShow = scrolled > 500;
+            if (shouldBtnShow !== isScrollBtnVisible) {
+                if (shouldBtnShow) scrollTopBtn.classList.add('visible');
+                else scrollTopBtn.classList.remove('visible');
+                isScrollBtnVisible = shouldBtnShow;
+            }
+        }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+
+    // 5. Smooth Scroll (Lenis)
     if (typeof Lenis !== 'undefined' && !isMobile) {
         const lenis = new Lenis({
             duration: 1.2,
@@ -49,30 +114,38 @@ document.addEventListener('DOMContentLoaded', () => {
             smoothTouch: false
         });
 
-        function raf(time) {
+        const raf = (time) => {
             lenis.raf(time);
             requestAnimationFrame(raf);
         }
         requestAnimationFrame(raf);
 
-        const scrollTopBtn = document.getElementById('scrollTop');
         if (scrollTopBtn) scrollTopBtn.addEventListener('click', () => lenis.scrollTo(0));
     } else {
-        const scrollTopBtn = document.getElementById('scrollTop');
         if (scrollTopBtn) scrollTopBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
     }
 
+
+    // 6. Cursor Logic (Hardware Accelerated)
     const cursorDot = document.querySelector('[data-cursor-dot]');
     const cursorOutline = document.querySelector('[data-cursor-outline]');
 
-    if (!isMobile && cursorDot) {
-        window.addEventListener('mousemove', (e) => {
+    if (!isMobile && cursorDot && cursorOutline) {
+        // Use transform instead of top/left to avoid layout trashing
+        const moveCursor = (e) => {
             const posX = e.clientX;
             const posY = e.clientY;
-            cursorDot.style.left = `${posX}px`;
-            cursorDot.style.top = `${posY}px`;
-            cursorOutline.animate({ left: `${posX}px`, top: `${posY}px` }, { duration: 500, fill: "forwards" });
-        });
+            
+            // Direct transform for the dot (instant)
+            cursorDot.style.transform = `translate3d(${posX}px, ${posY}px, 0) translate(-50%, -50%)`;
+            
+            // Animation for the outline
+            cursorOutline.animate({
+                transform: `translate3d(${posX}px, ${posY}px, 0) translate(-50%, -50%)`
+            }, { duration: 500, fill: "forwards" });
+        };
+
+        window.addEventListener('mousemove', moveCursor, { passive: true });
 
         const interactives = document.querySelectorAll('a, button, .project-item, .hover-trigger');
         interactives.forEach(el => {
@@ -81,41 +154,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const nav = document.querySelector('.hud-nav');
-    const scrollTopBtn = document.getElementById('scrollTop');
-
-    window.addEventListener('scroll', () => {
-        const scrolled = window.scrollY;
-
-        // Apply scroll effect only on desktop (mobile is always fixed via CSS)
-        if (!isMobile && nav) {
-            if (scrolled > 50) {
-                nav.classList.add('scrolled');
-            } else {
-                nav.classList.remove('scrolled');
-            }
-        }
-
-        if (scrollTopBtn) {
-            if (scrolled > 500) scrollTopBtn.classList.add('visible');
-            else scrollTopBtn.classList.remove('visible');
-        }
-    }, { passive: true });
-
+    // 7. Background Curtain Logic (IntersectionObserver)
     if ('IntersectionObserver' in window) {
         const allBgs = document.querySelectorAll('.curtain-img');
         const defaultBg = document.querySelector('#bg-default');
         const projectItems = document.querySelectorAll('.project-item');
         const heroSection = document.querySelector('.hero-section');
 
+        // Helper to batch class removals
+        const resetBgs = () => {
+             allBgs.forEach(bg => {
+                bg.classList.remove('active-project');
+                bg.classList.remove('default-visible');
+            });
+        };
+
         const activateProjectBg = (targetId) => {
             const targetBg = document.getElementById(targetId);
             if (targetBg) {
                 requestAnimationFrame(() => {
-                    allBgs.forEach(bg => {
-                        bg.classList.remove('active-project');
-                        bg.classList.remove('default-visible');
-                    });
+                    resetBgs();
                     targetBg.classList.add('active-project');
                 });
             }
@@ -123,10 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const activateDefaultBg = () => {
             requestAnimationFrame(() => {
-                allBgs.forEach(bg => {
-                    bg.classList.remove('active-project');
-                    bg.classList.remove('default-visible');
-                });
+                resetBgs();
                 if (defaultBg) defaultBg.classList.add('default-visible');
             });
         };
