@@ -61,9 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
               }, "-=0.2");
         };
 
-        // LCP Optimization: Immediate hide on mobile
+        // LCP OPTIMIZATION: Instant kill on mobile
         if (isMobile) {
-            requestAnimationFrame(hideLoader);
+            loader.style.display = 'none';
+            // Optional: You could manually reveal the text here if needed, 
+            // but relying on CSS defaults is faster for LCP
         } else {
             setTimeout(hideLoader, 300);
         }
